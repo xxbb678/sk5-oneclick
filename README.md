@@ -1,36 +1,40 @@
-# SOCKS5 代理一键搭建脚本
+# SOCKS5 代理管理脚本
 
-支持 **Alpine / Debian / Ubuntu**，自动识别原生 IPv4 / 纯 IPv6 / WARP 环境，安装时交互输入端口、用户名、密码。
+支持 **Alpine / Debian / Ubuntu**，自动识别原生 IPv4 / 纯 IPv6 / WARP 环境。
 
-## 一行安装
+## 一行运行
 
-    sh <(curl -fsSL https://cdn.jsdelivr.net/gh/xxbb678/sk5-oneclick@main/sk5.sh)
+    bash <(curl -fsSL https://cdn.jsdelivr.net/gh/xxbb678/sk5-oneclick@main/sk5.sh)
 
 或下载后执行：
 
     curl -fsSL https://cdn.jsdelivr.net/gh/xxbb678/sk5-oneclick@main/sk5.sh -o sk5.sh
-    sh sk5.sh
+    chmod +x sk5.sh && ./sk5.sh
 
-## 使用
+## 菜单
 
-    # 安装（交互输入参数）
-    sh sk5.sh
+    [1] 安装 SOCKS5
+    [2] 查看节点链接
+    [3] 更改监听端口
+    [4] 重启服务
+    [5] 卸载 SOCKS5
+    [0] 退出脚本
 
-    # 卸载
-    sh sk5.sh uninstall
+## 安装参数
 
-    # 非交互（环境变量指定）
-    SK5_PORT=1080 SK5_USER=user SK5_PASS='pass' sh sk5.sh
-
-## 参数说明
-
-安装时依次询问，直接回车使用默认值：
+选 1 安装时依次询问，直接回车使用默认值：
 
 - **端口** — 1-65535，默认 `21461`
 - **用户名** — 字母数字与 `_ . @ -`，默认 `admin`
 - **密码** — 自动生成 16 位随机密码
 
-也可用环境变量 `SK5_PORT` / `SK5_USER` / `SK5_PASS` 预先指定，三项齐全时跳过交互。
+也可用环境变量 `SK5_PORT` / `SK5_USER` / `SK5_PASS` 预先指定，三项齐全时跳过交互直接安装。
+
+## 命令行模式（不进菜单）
+
+    sh sk5.sh install      # 安装
+    sh sk5.sh show         # 查看节点信息
+    sh sk5.sh uninstall    # 卸载
 
 ## 系统行为
 
@@ -44,14 +48,18 @@
 ## 特性
 
 - 按网卡逐个过滤，排除 WARP 与 docker0/br-/veth 等虚拟网卡，正确判定原生 IPv4 / 纯 IPv6
-- 安装完成后清屏并在顶部重印节点信息与 TG 链接（用户名密码已 URL 编码）
-- 卸载带端口释放验证
-- 管道方式（`curl ... | sh`）下从 /dev/tty 读取输入，无终端时自动回退默认值
+- 安装后自动认证自检，能捕获“端口通但用户不存在”这类故障
+- 卸载不带参数时自动探测监听端口
+- TG 链接中的用户名密码自动 URL 编码
+- 管道方式（`curl ... | bash`）下自动进入安装，不进菜单
 
-## 已验证
+## IPv6 节点注意
 
-- Debian 13 x86_64，纯 IPv6 + WARP 环境：安装、代理连通、卸载全链路正常
-- Alpine 分支逻辑同源，未实机验证
+服务器为 IPv6 时，TG 链接中的地址必须带方括号：
+
+    tg://socks?server=[2001:db8::1]&port=1080&user=u&pass=p
+
+客户端手动添加节点时，地址栏填写不带方括号的原始 IPv6。
 
 ## License
 
