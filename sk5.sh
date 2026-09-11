@@ -607,7 +607,7 @@ do_menu() {
         echo -e "${GREEN}===============================================${NC}"
         echo -e " SOCKS5 代理管理脚本"
         echo -e " 当前系统: $(command -v apk >/dev/null 2>&1 && echo alpine || echo debian)"
-        echo -e " 服务状态: ${GREEN}$status${NC}"
+        echo -e " 服务状态: $status"
         echo -e "${GREEN}===============================================${NC}"
         echo -e " ${CYAN}[1]${NC} 安装 SOCKS5"
         echo -e " ${CYAN}[2]${NC} 查看节点链接"
