@@ -431,7 +431,7 @@ EOF
     echo "用户名: ${USER}"
     echo "密码:   ${PASS}"
     if [ "$MODE" = "v6" ]; then
-        echo "TG链接: tg://socks?server=[${IPV6}]&port=${PORT}&user=${_UE}&pass=${_PE}"
+        echo "TG链接: tg://socks?server=${IPV6}&port=${PORT}&user=${_UE}&pass=${_PE}"
     else
         echo "TG链接: tg://socks?server=${PUBIP}&port=${PORT}&user=${_UE}&pass=${_PE}"
     fi
@@ -511,7 +511,7 @@ show_info() {
         _host="$ipv4"
         [ -n "$pubip" ] && _host="$pubip"
     elif [ -n "$ipv6" ]; then
-        _host="[$ipv6]"
+        _host="$ipv6"
     else
         _host="${pubip:-<unknown>}"
     fi
