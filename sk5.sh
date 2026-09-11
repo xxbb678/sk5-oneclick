@@ -1,4 +1,10 @@
 #!/usr/bin/env bash
+# 若被 sh/dash 调用，自动重新用 bash 执行（dash 不支持 echo -e，会打印 -e 字面量）
+if [ -z "$BASH_VERSION" ]; then
+    if command -v bash >/dev/null 2>&1; then
+        exec bash "$0" "$@"
+    fi
+fi
 # ============================================================
 # SOCKS5 代理一键搭建（合并版：多系统 + 纯 IPv6/WARP 修复）
 # 支持：Alpine / Debian / Ubuntu，自动识别 IPv4 / 纯 IPv6，兼容 WARP 出站
@@ -33,6 +39,7 @@ uninstall_sk5() {
         rc-service sockd stop 2>/dev/null || true
         rc-update del sockd default 2>/dev/null || true
         rm -f /etc/sockd.conf /etc/danted.conf
+        rm -rf /etc/sk5
         deluser "$USER" 2>/dev/null || true
         apk del dante-server dante-server-openrc 2>/dev/null || true
 
@@ -41,6 +48,7 @@ uninstall_sk5() {
         systemctl disable danted microsocks 2>/dev/null || true
         rm -f /etc/danted.conf /etc/sockd.conf
         rm -f /etc/systemd/system/microsocks.service
+        rm -rf /etc/sk5
         systemctl daemon-reload 2>/dev/null || true
         userdel -f "$USER" 2>/dev/null || true
 
@@ -67,16 +75,11 @@ uninstall_sk5() {
     fi
 }
 
+# show / 其他参数由文件末尾的正式入口处理，此处只处理卸载
 case "${1:-install}" in
     uninstall|remove|del)
         uninstall_sk5
         exit 0
-        ;;
-    install|"")
-        ;;
-    *)
-        echo "用法：sh $0 [install|uninstall]"
-        exit 1
         ;;
 esac
 
@@ -92,6 +95,21 @@ gen_pass() {
     else
         head -c 8 /dev/urandom | od -An -tx1 | tr -d ' \n'
     fi
+}
+
+# 保存/读取本次安装的凭据（密码无法从系统反查，落盘以便「查看节点链接」显示）
+CRED_FILE="/etc/sk5/credentials"
+
+save_cred() {
+    mkdir -p /etc/sk5 2>/dev/null || true
+    ( umask 077; printf 'PORT=%s\nUSER=%s\nPASS=%s\n' "${PORT:-}" "${USER:-}" "${PASS:-}" > "$CRED_FILE" ) 2>/dev/null || true
+    chmod 600 "$CRED_FILE" 2>/dev/null || true
+}
+
+load_cred() {
+    [ -f "$CRED_FILE" ] || return 1
+    . "$CRED_FILE" 2>/dev/null || return 1
+    return 0
 }
 
 # URL 编码（用于 TG 链接中的用户名/密码）
@@ -425,6 +443,7 @@ EOF
     PUBIP=$(curl -s4 --max-time 8 https://api.ipify.org 2>/dev/null || curl -s6 --max-time 8 https://api64.ipify.org 2>/dev/null || echo "<你的公网IP>")
 
     # 安装过程输出较多，清屏后在顶部突出显示节点信息
+    save_cred   # 密码无法从系统反查，落盘供「查看节点链接」使用
     command -v clear >/dev/null 2>&1 && clear 2>/dev/null || printf '\033[2J\033[H'
     _UE=$(urlenc "$USER")
     _PE=$(urlenc "$PASS")
@@ -503,12 +522,20 @@ show_info() {
         return 1
     fi
 
+    # 从本次运行参数或落盘凭据里取用户名/密码（密码无法从系统反查）
+    load_cred 2>/dev/null || true
+    local _cport="${PORT:-}" _cuser="${USER:-}" _cpass="${PASS:-}"
+
     user=""
     if [ -f /etc/systemd/system/microsocks.service ]; then
         user=$(grep -oE '\-u "?[A-Za-z0-9_.@-]+' /etc/systemd/system/microsocks.service 2>/dev/null | sed 's/-u "\?//' | head -1)
+        [ -z "$pass" ] && pass=$(grep -oE '\-P "?[^"[:space:]]+' /etc/systemd/system/microsocks.service 2>/dev/null | sed 's/-P "\?//' | head -1)
     fi
-    [ -z "$user" ] && user="${USER:-admin}"
-    pass="${PASS:-}"
+    [ -z "$user" ] && user="${_cuser:-${USER:-admin}}"
+    pass="${_cpass:-${PASS:-}}"
+    [ -z "$pass" ] && [ -f /etc/sk5/credentials ] && pass=$(awk -F= '/^PASS=/{print substr($0,6)}' /etc/sk5/credentials 2>/dev/null)
+    [ -z "$user" ] && [ -f /etc/sk5/credentials ] && user=$(awk -F= '/^USER=/{print substr($0,6)}' /etc/sk5/credentials 2>/dev/null)
+    [ -z "$user" ] && user="admin"
 
     ipv4=""
     for dev in $(ip -4 -o addr show scope global 2>/dev/null | awk '{print $2}'); do
