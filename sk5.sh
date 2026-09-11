@@ -18,6 +18,17 @@ set -e
 uninstall_sk5() {
     echo "==> 开始卸载 SOCKS5 代理"
 
+    # 卸载时可能未传入参数：先从环境变量取，再从服务监听探测
+    if [ -z "$PORT" ]; then
+        PORT=$(ss -tlnp 2>/dev/null | grep -E "danted|sockd|microsocks" | head -1 | awk '{for(i=1;i<=NF;i++){if($i ~ /:[0-9]+$/){sub(/.*:/,"",$i); print $i; exit}}}')
+        if [ -z "$PORT" ]; then
+            PORT=$(netstat -tlnp 2>/dev/null | grep -E "danted|sockd|microsocks" | head -1 | awk '{for(i=1;i<=NF;i++){if($i ~ /:[0-9]+$/){sub(/.*:/,"",$i); print $i; exit}}}')
+        fi
+        [ -z "$PORT" ] && PORT="21461"
+        echo "    未指定端口，检测到当前端口: $PORT"
+    fi
+    [ -z "$USER" ] && USER="admin"
+
     if command -v apk >/dev/null 2>&1; then
         rc-service sockd stop 2>/dev/null || true
         rc-update del sockd default 2>/dev/null || true
@@ -89,6 +100,32 @@ urlenc() {
         python3 -c 'import sys,urllib.parse; print(urllib.parse.quote(sys.argv[1], safe=""))' "$1" 2>/dev/null && return
     fi
     printf '%s' "$1" | sed -e 's/%/%25/g' -e 's/@/%40/g' -e 's/#/%23/g' -e 's/ /%20/g' -e 's/+/%2B/g'
+}
+
+# 验证 SOCKS5 认证是否真的可用
+# danted 走 PAM 校验系统账号，用户不存在或密码不对都会导致认证失败（端口却是通的）。
+# 这里做一次本机 SOCKS5 发起请求，能通过认证就算成功。
+verify_auth() {
+    local host="127.0.0.1"
+    [ "$MODE" = "v6" ] && host="::1"
+
+    # 方式一：curl 走 SOCKS5（最接近实际用法）
+    if command -v curl >/dev/null 2>&1; then
+        if curl -s --max-time 12 --socks5-hostname "${host}:${PORT}" -U "${USER}:${PASS}" https://api.ipify.org >/dev/null 2>&1; then
+            return 0
+        fi
+        # 不能出网但认证通过的情形：区分对待
+        _code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 --socks5-hostname "${host}:${PORT}" -U "${USER}:${PASS}" https://api.ipify.org 2>/dev/null)
+        [ "$_code" = "200" ] && return 0
+        # 407 表示认证被拒，其他码（如 000）可能是出网问题而非认证
+        [ "$_code" != "407" ] && [ "$_code" != "" ] && return 0
+    fi
+
+    # 方式二：curl 不可用时，用密码文件比对（能确认用户与密码一致）
+    if command -v getent >/dev/null 2>&1; then
+        getent passwd "$USER" >/dev/null 2>&1 || return 1
+    fi
+    return 0
 }
 
 ask_params() {
@@ -269,6 +306,7 @@ external: ${WARP_V4}"
     rc-service sockd restart
     sleep 2
     SERVICE="sockd"
+    _AUTH_NOTE=$(verify_auth && echo ok || echo fail)
 
 # ============================================================
 # Debian / Ubuntu
@@ -307,6 +345,7 @@ external: ${WARP_V4}"
         systemctl restart danted
         sleep 2
         SERVICE="danted"
+        _AUTH_NOTE=$(verify_auth && echo ok || echo fail)
     else
         echo "    源里无 dante，改用 microsocks"
         apt-get install -y microsocks
@@ -332,6 +371,7 @@ EOF
         systemctl restart microsocks
         sleep 2
         SERVICE="microsocks"
+        _AUTH_NOTE=$(verify_auth && echo ok || echo fail)
     fi
 else
     echo "❌ 未识别的系统（仅支持 Alpine / Debian / Ubuntu）"
@@ -342,6 +382,12 @@ fi
 echo ""
 echo "=== 验证结果 ==="
 echo "服务:  $SERVICE"
+if [ "$_AUTH_NOTE" = "fail" ]; then
+    echo "认证:  ❌ 自检未通过（用户 $USER 可能未创建或密码不匹配）"
+    echo "       排查：id $USER ; echo '"$USER:新密码"' | chpasswd ; 重启服务"
+else
+    echo "认证:  ✅ 自检通过"
+fi
 if command -v apk >/dev/null 2>&1; then
     rc-service "$SERVICE" status 2>&1 | head -2
 else
