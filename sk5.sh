@@ -162,20 +162,11 @@ ask_params() {
         return 0
     fi
 
-    _TTY=/dev/tty
-    _HAS_TTY=0
-    if [ -e "$_TTY" ]; then
-        if (: < "$_TTY") 2>/dev/null; then
-            _HAS_TTY=1
-        fi
-    fi
-    if [ "$_HAS_TTY" = "0" ]; then
-        # 无交互终端：用默认值兜底
+    # 无交互终端（管道方式）：使用默认值兜底
+    if [ ! -t 0 ]; then
         [ -z "$PORT" ] && PORT=$(gen_port)
         [ -z "$USER" ] && USER="admin"
-        if [ -z "$PASS" ]; then
-            PASS=$(gen_pass)
-        fi
+        [ -z "$PASS" ] && PASS=$(gen_pass)
         echo "    无交互终端，使用默认参数: 端口=$PORT 用户=$USER"
         return 0
     fi
@@ -183,13 +174,12 @@ ask_params() {
     # 端口
     if [ -z "$PORT" ]; then
         while :; do
-            printf "
-请输入监听端口 (1-65535，直接回车随机): " > "$_TTY"
-            read -r _p < "$_TTY" || _p=""
+            printf "\n请输入监听端口 (1-65535，直接回车随机): "
+            read -r _p || _p=""
             [ -z "$_p" ] && { PORT=$(gen_port); break; }
             case "$_p" in
-                *[!0-9]*|'') echo "⚠ 端口必须是数字" > "$_TTY" ;;
-                *) if [ "$_p" -ge 1 ] && [ "$_p" -le 65535 ]; then PORT="$_p"; break; else echo "⚠ 端口超出 1-65535" > "$_TTY"; fi ;;
+                *[!0-9]*|'') echo "⚠ 端口必须是数字" ;;
+                *) if [ "$_p" -ge 1 ] && [ "$_p" -le 65535 ]; then PORT="$_p"; break; else echo "⚠ 端口超出 1-65535"; fi ;;
             esac
         done
     fi
@@ -197,11 +187,11 @@ ask_params() {
     # 用户名
     if [ -z "$USER" ]; then
         while :; do
-            printf "请输入认证用户名 (直接回车默认 admin): " > "$_TTY"
-            read -r _u < "$_TTY" || _u=""
+            printf "请输入认证用户名 (直接回车默认 admin): "
+            read -r _u || _u=""
             [ -z "$_u" ] && { USER="admin"; break; }
             case "$_u" in
-                *[!A-Za-z0-9_.@-]*) echo "⚠ 用户名只能含字母、数字、_ . @ -" > "$_TTY" ;;
+                *[!A-Za-z0-9_.@-]*) echo "⚠ 用户名只能含字母、数字、_ . @ -" ;;
                 *) USER="$_u"; break ;;
             esac
         done
@@ -210,18 +200,18 @@ ask_params() {
     # 密码
     if [ -z "$PASS" ]; then
         while :; do
-            printf "请输入认证密码 (直接回车自动生成 16 位随机密码): " > "$_TTY"
-            read -r _pw < "$_TTY" || _pw=""
+            printf "请输入认证密码 (直接回车自动生成 16 位随机密码): "
+            read -r _pw || _pw=""
             [ -z "$_pw" ] && { PASS=$(gen_pass); break; }
             case "$_pw" in
-                *[!A-Za-z0-9_.@#%+=-]*) echo "⚠ 密码含不支持的字符（可用：字母数字 _ . @ # % + = - ）" > "$_TTY" ;;
+                *[!A-Za-z0-9_.@#%+=-]*) echo "⚠ 密码含不支持的字符（可用：字母数字 _ . @ # % + = - ）" ;;
                 *) PASS="$_pw"; break ;;
             esac
         done
     fi
 
-    echo "" > "$_TTY"
-    echo "    将使用：端口=$PORT  用户名=$USER" > "$_TTY"
+    echo ""
+    echo "    将使用：端口=$PORT  用户名=$USER"
 }
 
 # ================= 安装 =================
