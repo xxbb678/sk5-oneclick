@@ -24,8 +24,8 @@ uninstall_sk5() {
         if [ -z "$PORT" ]; then
             PORT=$(netstat -tlnp 2>/dev/null | grep -E "danted|sockd|microsocks" | head -1 | awk '{for(i=1;i<=NF;i++){if($i ~ /:[0-9]+$/){sub(/.*:/,"",$i); print $i; exit}}}')
         fi
-        [ -z "$PORT" ] && PORT="21461"
-        echo "    未指定端口，检测到当前端口: $PORT"
+        [ -z "$PORT" ] && PORT=""
+        [ -n "$PORT" ] && echo "    未指定端口，检测到当前端口: $PORT"
     fi
     [ -z "$USER" ] && USER="admin"
 
@@ -95,6 +95,33 @@ gen_pass() {
 }
 
 # URL 编码（用于 TG 链接中的用户名/密码）
+# 端口是否被占用
+_port_taken() {
+    local p="$1"
+    if command -v ss >/dev/null 2>&1; then
+        ss -tln 2>/dev/null | grep -q ":$p " && return 0
+        ss -uln 2>/dev/null | grep -q ":$p " && return 0
+    elif command -v netstat >/dev/null 2>&1; then
+        netstat -tln 2>/dev/null | grep -q ":$p " && return 0
+        netstat -uln 2>/dev/null | grep -q ":$p " && return 0
+    fi
+    return 1
+}
+
+# 生成随机端口（10000-65535），避开已占用端口
+gen_port() {
+    local p i=0
+    while [ "$i" -lt 60 ]; do
+        p=$(( (RANDOM % 55535) + 10000 ))
+        if ! _port_taken "$p"; then
+            printf '%s' "$p"
+            return 0
+        fi
+        i=$((i + 1))
+    done
+    printf '%s' "$(( (RANDOM % 55535) + 10000 ))"
+}
+
 urlenc() {
     if command -v python3 >/dev/null 2>&1; then
         python3 -c 'import sys,urllib.parse; print(urllib.parse.quote(sys.argv[1], safe=""))' "$1" 2>/dev/null && return
@@ -144,7 +171,7 @@ ask_params() {
     fi
     if [ "$_HAS_TTY" = "0" ]; then
         # 无交互终端：用默认值兜底
-        [ -z "$PORT" ] && PORT=21461
+        [ -z "$PORT" ] && PORT=$(gen_port)
         [ -z "$USER" ] && USER="admin"
         if [ -z "$PASS" ]; then
             PASS=$(gen_pass)
@@ -157,9 +184,9 @@ ask_params() {
     if [ -z "$PORT" ]; then
         while :; do
             printf "
-请输入监听端口 (1-65535，直接回车默认 21461): " > "$_TTY"
+请输入监听端口 (1-65535，直接回车随机): " > "$_TTY"
             read -r _p < "$_TTY" || _p=""
-            [ -z "$_p" ] && { PORT=21461; break; }
+            [ -z "$_p" ] && { PORT=$(gen_port); break; }
             case "$_p" in
                 *[!0-9]*|'') echo "⚠ 端口必须是数字" > "$_TTY" ;;
                 *) if [ "$_p" -ge 1 ] && [ "$_p" -le 65535 ]; then PORT="$_p"; break; else echo "⚠ 端口超出 1-65535" > "$_TTY"; fi ;;
@@ -199,6 +226,8 @@ ask_params() {
 
 # ================= 安装 =================
 install_sk5() {
+
+    ask_params
 
     # ---------- 网络检测 ----------
     # 取默认出站网卡
