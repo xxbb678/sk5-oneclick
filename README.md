@@ -4,11 +4,13 @@
 
 ## 一行运行
 
-    bash <(curl -fsSL https://cdn.jsdelivr.net/gh/xxbb678/sk5-oneclick@main/sk5.sh)
+    bash <(curl -fsSL https://cdn.jsdelivr.net/gh/xxbb678/sk5-oneclick@latest/sk5.sh)
+
+> 注意：不要用 `@main` 地址，jsDelivr 对它的缓存会滞留旧版本。用 `@latest` 或固定 commit 版本号。
 
 或下载后执行：
 
-    curl -fsSL https://cdn.jsdelivr.net/gh/xxbb678/sk5-oneclick@main/sk5.sh -o sk5.sh
+    curl -fsSL https://cdn.jsdelivr.net/gh/xxbb678/sk5-oneclick@latest/sk5.sh -o sk5.sh
     chmod +x sk5.sh && ./sk5.sh
 
 ## 菜单
