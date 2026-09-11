@@ -401,17 +401,23 @@ EOF
     # ---------- 验证 ----------
     echo ""
     echo "=== 验证结果 ==="
-    echo "服务:  $SERVICE"
+    echo -e "${GREEN}服务:  $SERVICE${NC}"
     if [ "$_AUTH_NOTE" = "fail" ]; then
         echo "认证:  ❌ 自检未通过（用户 $USER 可能未创建或密码不匹配）"
         echo "       排查：id $USER ; echo '"$USER:新密码"' | chpasswd ; 重启服务"
     else
         echo "认证:  ✅ 自检通过"
     fi
-    if command -v apk >/dev/null 2>&1; then
-        rc-service "$SERVICE" status 2>&1 | head -2
+    _svcname="$(_detect_service)"
+    if _service_installed; then
+        if _service_running; then
+            echo -e "${GREEN}在运行${NC}"
+        else
+            echo -e "${RED}未运行${NC}"
+        fi
     else
-        systemctl is-active "$SERVICE" 2>/dev/null
+        echo -e "${RED}未安装${NC}"
+        echo -e "${RED}未运行${NC}"
     fi
     netstat -tlnp 2>/dev/null | grep ":${PORT}" || ss -tlnp 2>/dev/null | grep ":${PORT}"
 
@@ -464,6 +470,16 @@ restart_service() {
         rc-service "$svc" restart 2>&1 | tail -1
     else
         systemctl restart "$svc" 2>&1 | tail -1
+    fi
+}
+
+_service_installed() {
+    local svc
+    svc="$(_detect_service)"
+    if command -v apk >/dev/null 2>&1; then
+        [ -f "/etc/init.d/$svc" ]
+    else
+        [ -f "/etc/systemd/system/$svc.service" ] || [ -f "/lib/systemd/system/$svc.service" ] || [ -f "/usr/lib/systemd/system/$svc.service" ] || command -v "$svc" >/dev/null 2>&1
     fi
 }
 
@@ -521,7 +537,15 @@ show_info() {
 
     echo ""
     echo -e "${GREEN}========== SOCKS5 节点信息 ==========${NC}"
-    echo -e "🔧 服务状态: ${YELLOW}$(_service_running && echo '运行中' || echo '未运行')${NC}"
+    local _stat
+    if _service_running; then
+        _stat="${GREEN}运行中${NC}"
+    elif _service_installed; then
+        _stat="${RED}未运行${NC}"
+    else
+        _stat="${RED}未安装${NC}"
+    fi
+    echo -e "🔧 服务状态: ${_stat}"
     echo -e "🌐 网络模式: ${YELLOW}$mode${NC}"
     echo -e "📡 监听端口: ${YELLOW}$port${NC}"
     echo -e "👤 用户名:   ${YELLOW}$user${NC}"
@@ -577,13 +601,13 @@ do_menu() {
     local choice
     while true; do
         local status
-        if _service_running; then status="${GREEN}运行中${NC}"; else status="${RED}未安装或未运行${NC}"; fi
+        if _service_running; then status="${GREEN}运行中${NC}"; elif _service_installed; then status="${RED}未运行${NC}"; else status="${RED}未安装${NC}"; fi
 
         clear
         echo -e "${GREEN}===============================================${NC}"
         echo -e " SOCKS5 代理管理脚本"
         echo -e " 当前系统: $(command -v apk >/dev/null 2>&1 && echo alpine || echo debian)"
-        echo -e " 服务状态: $status"
+        echo -e " 服务状态: ${GREEN}$status${NC}"
         echo -e "${GREEN}===============================================${NC}"
         echo -e " ${CYAN}[1]${NC} 安装 SOCKS5"
         echo -e " ${CYAN}[2]${NC} 查看节点链接"
