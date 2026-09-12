@@ -147,6 +147,26 @@ urlenc() {
     printf '%s' "$1" | sed -e 's/%/%25/g' -e 's/@/%40/g' -e 's/#/%23/g' -e 's/ /%20/g' -e 's/+/%2B/g'
 }
 
+# base64 编码（供小火箭等客户端导入的 socks:// 链接使用，标准格式为 base64(user:pass)）
+b64() {
+    if command -v base64 >/dev/null 2>&1; then
+        printf '%s' "$1" | base64 | tr -d '\n'
+    elif command -v openssl >/dev/null 2>&1; then
+        printf '%s' "$1" | openssl base64 -A
+    fi
+}
+
+# 输出各客户端可直接导入的链接
+# - tg://socks   ：Telegram 专用
+# - socks://base64(user:pass)@host:port ：小火箭 / Shadowrocket、v2rayNG、Nekoray 等通用格式
+print_links() {
+    local host="$1" port="$2" user="$3" pass="$4"
+    local auth_b64
+    auth_b64=$(b64 "${user}:${pass}")
+    echo "tg://socks?server=${host}&port=${port}&user=$(urlenc "$user")&pass=$(urlenc "$pass")"
+    echo "socks://${auth_b64}@${host}:${port}"
+}
+
 # 验证 SOCKS5 认证是否真的可用
 # danted 走 PAM 校验系统账号，用户不存在或密码不对都会导致认证失败（端口却是通的）。
 # 这里做一次本机 SOCKS5 发起请求，能通过认证就算成功。
@@ -455,10 +475,13 @@ EOF
     echo "端口:   ${PORT}"
     echo "用户名: ${USER}"
     echo "密码:   ${PASS}"
+    _B64=$(b64 "${USER}:${PASS}")
     if [ "$MODE" = "v6" ]; then
-        echo "TG链接: tg://socks?server=${IPV6}&port=${PORT}&user=${_UE}&pass=${_PE}"
+        echo "TG链接: tg://socks?server=[${IPV6}]&port=${PORT}&user=${_UE}&pass=${_PE}"
+        echo "小火箭:  socks://${_B64}@[${IPV6}]:${PORT}"
     else
         echo "TG链接: tg://socks?server=${PUBIP}&port=${PORT}&user=${_UE}&pass=${_PE}"
+        echo "小火箭:  socks://${_B64}@${PUBIP}:${PORT}"
     fi
     echo "======================================"
 }
@@ -579,8 +602,15 @@ show_info() {
     [ -n "$pass" ] && echo -e "🔐 密码:     ${YELLOW}$pass${NC}"
     echo ""
     if [ -n "$user" ] && [ -n "$pass" ]; then
+        _B64=$(b64 "${user}:${pass}")
         echo -e "${GREEN}📎 TG 链接:${NC}"
-        echo -e "${YELLOW}tg://socks?server=${_host}&port=${port}&user=${_ue}&pass=${_pe}${NC}"
+        if [ "$mode" = "IPv6-only" ]; then
+            echo -e "${YELLOW}tg://socks?server=[${_host}]&port=${port}&user=${_ue}&pass=${_pe}${NC}"
+            echo -e "${YELLOW}小火箭:  socks://${_B64}@[${_host}]:${port}${NC}"
+        else
+            echo -e "${YELLOW}tg://socks?server=${_host}&port=${port}&user=${_ue}&pass=${_pe}${NC}"
+            echo -e "${YELLOW}小火箭:  socks://${_B64}@${_host}:${port}${NC}"
+        fi
     else
         echo -e "${YELLOW}密码未知（本次运行未提供）。可用 SK5_PASS=你的密码 重跑脚本后选 2 查看${NC}"
     fi
