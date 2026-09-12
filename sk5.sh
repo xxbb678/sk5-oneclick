@@ -477,8 +477,8 @@ EOF
     echo "密码:   ${PASS}"
     _B64=$(b64 "${USER}:${PASS}")
     if [ "$MODE" = "v6" ]; then
-        echo "TG链接: tg://socks?server=[${IPV6}]&port=${PORT}&user=${_UE}&pass=${_PE}"
-        echo "小火箭:  socks://${_B64}@[${IPV6}]:${PORT}"
+        echo "TG链接: tg://socks?server=${IPV6}&port=${PORT}&user=${_UE}&pass=${_PE}"
+        echo "小火箭:  socks://${_B64}@${IPV6}:${PORT}"
     else
         echo "TG链接: tg://socks?server=${PUBIP}&port=${PORT}&user=${_UE}&pass=${_PE}"
         echo "小火箭:  socks://${_B64}@${PUBIP}:${PORT}"
@@ -604,13 +604,8 @@ show_info() {
     if [ -n "$user" ] && [ -n "$pass" ]; then
         _B64=$(b64 "${user}:${pass}")
         echo -e "${GREEN}📎 TG 链接:${NC}"
-        if [ "$mode" = "IPv6-only" ]; then
-            echo -e "${YELLOW}tg://socks?server=[${_host}]&port=${port}&user=${_ue}&pass=${_pe}${NC}"
-            echo -e "${YELLOW}小火箭:  socks://${_B64}@[${_host}]:${port}${NC}"
-        else
-            echo -e "${YELLOW}tg://socks?server=${_host}&port=${port}&user=${_ue}&pass=${_pe}${NC}"
-            echo -e "${YELLOW}小火箭:  socks://${_B64}@${_host}:${port}${NC}"
-        fi
+        echo -e "${YELLOW}tg://socks?server=${_host}&port=${port}&user=${_ue}&pass=${_pe}${NC}"
+        echo -e "${YELLOW}小火箭:  socks://${_B64}@${_host}:${port}${NC}"
     else
         echo -e "${YELLOW}密码未知（本次运行未提供）。可用 SK5_PASS=你的密码 重跑脚本后选 2 查看${NC}"
     fi
