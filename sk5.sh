@@ -147,7 +147,7 @@ urlenc() {
     printf '%s' "$1" | sed -e 's/%/%25/g' -e 's/@/%40/g' -e 's/#/%23/g' -e 's/ /%20/g' -e 's/+/%2B/g'
 }
 
-# base64 编码（供小火箭等客户端导入的 socks:// 链接使用，标准格式为 base64(user:pass)）
+# base64 编码（供socks5等客户端导入的 socks:// 链接使用，标准格式为 base64(user:pass)）
 b64() {
     if command -v base64 >/dev/null 2>&1; then
         printf '%s' "$1" | base64 | tr -d '\n'
@@ -158,7 +158,7 @@ b64() {
 
 # 输出各客户端可直接导入的链接
 # - tg://socks   ：Telegram 专用
-# - socks://base64(user:pass)@host:port ：小火箭 / Shadowrocket、v2rayNG、Nekoray 等通用格式
+# - socks://base64(user:pass)@host:port ：socks5 / Shadowrocket、v2rayNG、Nekoray 等通用格式
 print_links() {
     local host="$1" port="$2" user="$3" pass="$4"
     local auth_b64
@@ -478,10 +478,10 @@ EOF
     _B64=$(b64 "${USER}:${PASS}")
     if [ "$MODE" = "v6" ]; then
         echo "TG链接: tg://socks?server=${IPV6}&port=${PORT}&user=${_UE}&pass=${_PE}"
-        echo "小火箭:  socks://${_B64}@[${IPV6}]:${PORT}"
+        echo "socks5:  socks://${_B64}@[${IPV6}]:${PORT}"
     else
         echo "TG链接: tg://socks?server=${PUBIP}&port=${PORT}&user=${_UE}&pass=${_PE}"
-        echo "小火箭:  socks://${_B64}@${PUBIP}:${PORT}"
+        echo "socks5:  socks://${_B64}@${PUBIP}:${PORT}"
     fi
     echo "======================================"
 }
@@ -606,9 +606,9 @@ show_info() {
         echo -e "${GREEN}📎 TG 链接:${NC}"
         echo -e "${YELLOW}tg://socks?server=${_host}&port=${port}&user=${_ue}&pass=${_pe}${NC}"
         if [ "$mode" = "IPv6-only" ]; then
-            echo -e "${YELLOW}小火箭:  socks://${_B64}@[${_host}]:${port}${NC}"
+            echo -e "${YELLOW}socks5:  socks://${_B64}@[${_host}]:${port}${NC}"
         else
-            echo -e "${YELLOW}小火箭:  socks://${_B64}@${_host}:${port}${NC}"
+            echo -e "${YELLOW}socks5:  socks://${_B64}@${_host}:${port}${NC}"
         fi
     else
         echo -e "${YELLOW}密码未知（本次运行未提供）。可用 SK5_PASS=你的密码 重跑脚本后选 2 查看${NC}"
